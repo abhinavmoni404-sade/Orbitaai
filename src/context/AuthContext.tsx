@@ -7,7 +7,6 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { auth } from '../firebase';
-import { apiFetch } from '../lib/api';
 import type { User } from '../types/orbita';
 import { useTheme } from './ThemeContext';
 
@@ -81,25 +80,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [usageQuota, setUsageQuota] = useState<DailyUsageQuota | null>(null);
   const { setThemePreference } = useTheme();
 
-  const refreshSession = useCallback(async () => {
-    if (!auth.currentUser) {
-      setUser(null);
-      setUsageQuota(null);
-      return;
-    }
-    try {
-      const data = await apiFetch<{ user: User; usage: DailyUsageQuota }>('/api/auth/me');
+  const syncBackendSession = useCallback(
+    async (fbUser: FirebaseUser) => {
+      const fetchWithToken = async (forceRefresh: boolean) => {
+        const token = await fbUser.getIdToken(forceRefresh);
+        const res = await fetch('/api/auth/me', {
+          credentials: 'include',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const text = await res.text();
+        let parsed: Record<string, unknown> = {};
+        if (text) {
+          try {
+            parsed = JSON.parse(text) as Record<string, unknown>;
+          } catch {
+            parsed = {};
+          }
+        }
+        return { res, parsed };
+      };
+
+      let result = await fetchWithToken(false);
+      if (result.res.status === 401) {
+        result = await fetchWithToken(true);
+      }
+
+      if (!result.res.ok) {
+        const msg =
+          typeof result.parsed.error === 'string' && result.parsed.error
+            ? result.parsed.error
+            : `Unable to verify workspace session (HTTP ${result.res.status}).`;
+        throw new Error(msg);
+      }
+
+      const data = result.parsed as unknown as { user: User; usage: DailyUsageQuota };
       setUser(data.user);
       setUsageQuota(data.usage);
       if (data.user.theme_preference) {
         setThemePreference(data.user.theme_preference);
       }
+    },
+    [setThemePreference]
+  );
+
+  const refreshSession = useCallback(async () => {
+    const current = auth.currentUser;
+    if (!current) {
+      setUser(null);
+      setUsageQuota(null);
+      return;
+    }
+    try {
+      await syncBackendSession(current);
     } catch (err) {
       setUser(null);
       setUsageQuota(null);
       setAuthError(err instanceof Error ? err.message : 'Unable to load workspace session.');
     }
-  }, [setThemePreference]);
+  }, [syncBackendSession]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
@@ -112,12 +150,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       try {
-        const data = await apiFetch<{ user: User; usage: DailyUsageQuota }>('/api/auth/me');
-        setUser(data.user);
-        setUsageQuota(data.usage);
-        if (data.user.theme_preference) {
-          setThemePreference(data.user.theme_preference);
-        }
+        await syncBackendSession(fbUser);
       } catch (err) {
         setUser(null);
         setUsageQuota(null);
@@ -128,29 +161,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => unsubscribe();
-  }, [setThemePreference]);
+  }, [syncBackendSession]);
 
-  const signInWithEmail = useCallback(async (email: string, password: string): Promise<boolean> => {
-    setAuthError(null);
-    try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
-      return true;
-    } catch (err) {
-      setAuthError(mapFirebaseAuthError(err, 'login'));
-      return false;
-    }
-  }, []);
+  const signInWithEmail = useCallback(
+    async (email: string, password: string): Promise<boolean> => {
+      setAuthError(null);
+      try {
+        const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+        await syncBackendSession(cred.user);
+        return true;
+      } catch (err) {
+        setAuthError(mapFirebaseAuthError(err, 'login'));
+        return false;
+      }
+    },
+    [syncBackendSession]
+  );
 
-  const signUpWithEmail = useCallback(async (email: string, password: string): Promise<boolean> => {
-    setAuthError(null);
-    try {
-      await createUserWithEmailAndPassword(auth, email.trim(), password);
-      return true;
-    } catch (err) {
-      setAuthError(mapFirebaseAuthError(err, 'signup'));
-      return false;
-    }
-  }, []);
+  const signUpWithEmail = useCallback(
+    async (email: string, password: string): Promise<boolean> => {
+      setAuthError(null);
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        await syncBackendSession(cred.user);
+        return true;
+      } catch (err) {
+        setAuthError(mapFirebaseAuthError(err, 'signup'));
+        return false;
+      }
+    },
+    [syncBackendSession]
+  );
 
   const logout = useCallback(async () => {
     try {

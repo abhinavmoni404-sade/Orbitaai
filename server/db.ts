@@ -1,5 +1,7 @@
 import Database from 'better-sqlite3';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type {
   AdminBillingConfig,
@@ -11,7 +13,23 @@ import type {
   SystemConfig,
 } from '../src/types/orbita.ts';
 
-const DB_PATH = path.resolve(process.cwd(), 'orbita.db');
+function resolveDbPath(): string {
+  if (process.env.ORBITA_DB_PATH?.trim()) {
+    return path.resolve(process.env.ORBITA_DB_PATH.trim());
+  }
+  const preferred = path.resolve(process.cwd(), 'orbita.db');
+  try {
+    fs.accessSync(path.dirname(preferred), fs.constants.W_OK);
+    if (fs.existsSync(preferred)) {
+      fs.accessSync(preferred, fs.constants.W_OK);
+    }
+    return preferred;
+  } catch {
+    return path.join(os.tmpdir(), 'orbita.db');
+  }
+}
+
+const DB_PATH = resolveDbPath();
 const db = new Database(DB_PATH);
 
 db.pragma('journal_mode = WAL');

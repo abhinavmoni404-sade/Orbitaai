@@ -7,20 +7,15 @@ import type { User } from '../src/types/orbita.ts';
 const ACTIVE_AUTH_PROJECT_ID = 'orbita-609d7';
 
 function readFirebaseProjectId(): string {
-  const envId = process.env.FIREBASE_PROJECT_ID?.trim();
-  return envId || ACTIVE_AUTH_PROJECT_ID;
+  return ACTIVE_AUTH_PROJECT_ID;
 }
 
 export function isFirebaseAuthConfigured(): boolean {
-  const projectId = readFirebaseProjectId();
-  return Boolean(projectId && projectId !== 'remixed-project-id');
+  return Boolean(readFirebaseProjectId());
 }
 
 function getFirebaseAdminAuth() {
   const projectId = readFirebaseProjectId();
-  if (!projectId || projectId === 'remixed-project-id') {
-    throw new Error('Firebase project is not provisioned yet.');
-  }
   const existing = getApps().find((a) => a.name === 'orbita-auth');
   const app = existing ?? initializeApp({ projectId }, 'orbita-auth');
   return getAuth(app);
