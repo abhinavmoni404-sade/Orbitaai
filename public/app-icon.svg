@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="appBg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#101827"/>
+      <stop offset="100%" stop-color="#182338"/>
+    </linearGradient>
+    <linearGradient id="ringGrad" x1="80" y1="80" x2="432" y2="432" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4563FF"/>
+      <stop offset="52%" stop-color="#8B7CFF"/>
+      <stop offset="100%" stop-color="#20C9B7"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#appBg)"/>
+  <path d="M376 150C344 112 301 90 256 90C164.3 90 90 164.3 90 256C90 347.7 164.3 422 256 422C336.5 422 403.5 364.6 418.8 288" stroke="url(#ringGrad)" stroke-width="38" stroke-linecap="round"/>
+  <ellipse cx="256" cy="256" rx="184" ry="86" transform="rotate(-24 256 256)" stroke="#20C9B7" stroke-opacity="0.72" stroke-width="16"/>
+  <circle cx="256" cy="256" r="56" fill="url(#ringGrad)"/>
+  <circle cx="406" cy="188" r="24" fill="#20C9B7"/>
+  <circle cx="132" cy="336" r="18" fill="#8B7CFF"/>
+</svg>
